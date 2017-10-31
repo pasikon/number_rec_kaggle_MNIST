@@ -256,12 +256,17 @@ def loaddta(csvp):
 # data = pd.read_csv('../input/train.csv')
 # test_data = pd.read_csv('../input/train.csv')
 
-X_train, Y_train = loaddta('../input/train.csv')
-X_test, Y_test = loaddta('../input/test.csv')
+X_loaded, Y_loaded = loaddta('../input/train.csv')
+# X_test, Y_test = loaddta('../input/test.csv')
+
+X_train = X_loaded[:, 0:39000]
+Y_train = Y_loaded[:, 0:39000]
+X_test = X_loaded[:, 39001:41999]
+Y_test = Y_loaded[:, 39001:41999]
 
 print('X_train shape:' + str(X_train.shape))
 print('Y_train shape:' + str(Y_train.shape))
 print('X_test shape:' + str(X_test.shape))
 print('Y_test shape:' + str(Y_test.shape))
 
-parameters = model(X_train, Y_train, X_test, Y_test, num_epochs=250)
+parameters = model(X_train, Y_train, X_test, Y_test, num_epochs=50)
