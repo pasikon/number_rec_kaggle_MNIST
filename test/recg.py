@@ -43,15 +43,16 @@ def create_placeholders(n_x, n_y):
     X = tf.placeholder(tf.float32, shape=(n_x, None), name="X")
     Y = tf.placeholder(tf.float32, shape=(n_y, None), name="Y")
     keepprob_A1 = tf.placeholder(tf.float32)
-    return X, Y, keepprob_A1
+    keepprob_A2 = tf.placeholder(tf.float32)
+    return X, Y, keepprob_A1, keepprob_A2
 
 
 def initialize_parameters():
     W1 = tf.get_variable("W1", [25, 784], initializer=tf.contrib.layers.xavier_initializer())
     b1 = tf.get_variable("b1", [25, 1], initializer=tf.zeros_initializer())
-    W2 = tf.get_variable("W2", [12, 25], initializer=tf.contrib.layers.xavier_initializer())
-    b2 = tf.get_variable("b2", [12, 1], initializer=tf.zeros_initializer())
-    W3 = tf.get_variable("W3", [10, 12], initializer=tf.contrib.layers.xavier_initializer())
+    W2 = tf.get_variable("W2", [17, 25], initializer=tf.contrib.layers.xavier_initializer())
+    b2 = tf.get_variable("b2", [17, 1], initializer=tf.zeros_initializer())
+    W3 = tf.get_variable("W3", [10, 17], initializer=tf.contrib.layers.xavier_initializer())
     b3 = tf.get_variable("b3", [10, 1], initializer=tf.zeros_initializer())
 
     parameters = {"W1": W1,
@@ -64,7 +65,7 @@ def initialize_parameters():
     return parameters
 
 
-def forward_propagation(X, parameters, keepprob_A1):
+def forward_propagation(X, parameters, keepprob_A1, keepprob_A2):
     W1 = parameters['W1']
     b1 = parameters['b1']
     W2 = parameters['W2']
@@ -78,8 +79,9 @@ def forward_propagation(X, parameters, keepprob_A1):
 
     Z2 = tf.matmul(W2, relu1_dropout) + b2  # Z2 = np.dot(W2, a1) + b2
     A2 = tf.nn.relu(Z2)  # A2 = relu(Z2)
+    relu2_dropout = tf.nn.dropout(A2, keep_prob=keepprob_A2)
 
-    Z3 = tf.matmul(W3, A2) + b3  # Z3 = np.dot(W3,Z2) + b3
+    Z3 = tf.matmul(W3, relu2_dropout) + b3  # Z3 = np.dot(W3,Z2) + b3
 
     return Z3
 
@@ -120,7 +122,7 @@ def random_mini_batches(X, Y, mini_batch_size=64, seed=0):
     return mini_batches
 
 
-def model(X_train, Y_train, X_test, Y_test, learning_rate=0.0001,
+def model(X_train, Y_train, X_test, Y_test, learning_rate=0.00015,
           num_epochs=1500, minibatch_size=32, print_cost=True):
     """
     Implements a three-layer tensorflow neural network: LINEAR->RELU->LINEAR->RELU->LINEAR->SOFTMAX.
@@ -146,13 +148,13 @@ def model(X_train, Y_train, X_test, Y_test, learning_rate=0.0001,
     costs = []  # To keep track of the cost
 
     # Create Placeholders of shape (n_x, n_y)
-    X, Y, keepprob_A1 = create_placeholders(n_x, n_y)
+    X, Y, keepprob_A1, keepprob_A2 = create_placeholders(n_x, n_y)
 
     # Initialize parameters
     parameters = initialize_parameters()
 
     # Forward propagation
-    Z3 = forward_propagation(X, parameters, keepprob_A1)
+    Z3 = forward_propagation(X, parameters, keepprob_A1, keepprob_A2)
 
     # Cost function: Add cost function to tensorflow graph
     cost = compute_cost(Z3, Y)
@@ -183,7 +185,7 @@ def model(X_train, Y_train, X_test, Y_test, learning_rate=0.0001,
 
                 # IMPORTANT: The line that runs the graph on a minibatch. Run the session to execute the "optimizer"
                 # and the "cost", the feedict should contain a minibatch for (X,Y).
-                _, minibatch_cost = sess.run([optimizer, cost], feed_dict={X: minibatch_X, Y: minibatch_Y, keepprob_A1: 0.7})
+                _, minibatch_cost = sess.run([optimizer, cost], feed_dict={X: minibatch_X, Y: minibatch_Y, keepprob_A1: 0.8, keepprob_A2: 0.7})
 
                 epoch_cost += minibatch_cost / num_minibatches
 
@@ -210,8 +212,8 @@ def model(X_train, Y_train, X_test, Y_test, learning_rate=0.0001,
         # Calculate accuracy on the test set
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
 
-        print("Train Accuracy:", accuracy.eval({X: X_train, Y: Y_train, keepprob_A1: 1}))
-        print("Test Accuracy:", accuracy.eval({X: X_test, Y: Y_test, keepprob_A1: 1}))
+        print("Train Accuracy:", accuracy.eval({X: X_train, Y: Y_train, keepprob_A1: 1, keepprob_A2: 1}))
+        print("Test Accuracy:", accuracy.eval({X: X_test, Y: Y_test, keepprob_A1: 1, keepprob_A2: 1}))
 
         return parameters
 
@@ -260,4 +262,4 @@ print('Y_train shape:' + str(Y_train.shape))
 print('X_test shape:' + str(X_test.shape))
 print('Y_test shape:' + str(Y_test.shape))
 
-parameters = model(X_train, Y_train, X_test, Y_test, num_epochs=550)
+parameters = model(X_train, Y_train, X_test, Y_test, num_epochs=200)
