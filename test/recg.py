@@ -43,55 +43,66 @@ def create_placeholders(n_x, n_y):
     X = tf.placeholder(tf.float32, shape=(n_x, None), name="X")
     Y = tf.placeholder(tf.float32, shape=(n_y, None), name="Y")
     keepprob_A1 = tf.placeholder(tf.float32)
-    return X, Y, keepprob_A1
+    keepprob_A2 = tf.placeholder(tf.float32)
+    return X, Y, keepprob_A1, keepprob_A2
 
 
 def initialize_parameters():
     W1 = tf.get_variable("W1", [25, 784], initializer=tf.contrib.layers.xavier_initializer())
     b1 = tf.get_variable("b1", [25, 1], initializer=tf.zeros_initializer())
-    W2 = tf.get_variable("W2", [12, 25], initializer=tf.contrib.layers.xavier_initializer())
-    b2 = tf.get_variable("b2", [12, 1], initializer=tf.zeros_initializer())
-    W3 = tf.get_variable("W3", [10, 12], initializer=tf.contrib.layers.xavier_initializer())
-    b3 = tf.get_variable("b3", [10, 1], initializer=tf.zeros_initializer())
+    W2 = tf.get_variable("W2", [17, 25], initializer=tf.contrib.layers.xavier_initializer())
+    b2 = tf.get_variable("b2", [17, 1], initializer=tf.zeros_initializer())
+    W3 = tf.get_variable("W3", [12, 17], initializer=tf.contrib.layers.xavier_initializer())
+    b3 = tf.get_variable("b3", [12, 1], initializer=tf.zeros_initializer())
+    W4 = tf.get_variable("W4", [10, 12], initializer=tf.contrib.layers.xavier_initializer())
+    b4 = tf.get_variable("b4", [10, 1], initializer=tf.zeros_initializer())
 
     parameters = {"W1": W1,
                   "b1": b1,
                   "W2": W2,
                   "b2": b2,
                   "W3": W3,
-                  "b3": b3}
+                  "b3": b3,
+                  "W4": W4,
+                  "b4": b4}
 
     return parameters
 
 
-def forward_propagation(X, parameters, keepprob_A1):
+def forward_propagation(X, parameters, keepprob_A1, keepprob_A2):
     W1 = parameters['W1']
     b1 = parameters['b1']
     W2 = parameters['W2']
     b2 = parameters['b2']
     W3 = parameters['W3']
     b3 = parameters['b3']
+    W4 = parameters['W4']
+    b4 = parameters['b4']
 
-    Z1 = tf.matmul(W1, X) + b1  # Z1 = np.dot(W1, X) + b1
-    A1 = tf.nn.relu(Z1)  # A1 = relu(Z1)
+    Z1 = tf.matmul(W1, X) + b1
+    A1 = tf.nn.relu(Z1)
     relu1_dropout = tf.nn.dropout(A1, keep_prob=keepprob_A1)
 
-    Z2 = tf.matmul(W2, relu1_dropout) + b2  # Z2 = np.dot(W2, a1) + b2
-    A2 = tf.nn.relu(Z2)  # A2 = relu(Z2)
+    Z2 = tf.matmul(W2, relu1_dropout) + b2
+    A2 = tf.nn.relu(Z2)
+    relu2_dropout = tf.nn.dropout(A2, keep_prob=keepprob_A2)
 
-    Z3 = tf.matmul(W3, A2) + b3  # Z3 = np.dot(W3,Z2) + b3
+    Z3 = tf.matmul(W3, relu2_dropout) + b3
+    A3 = tf.nn.relu(Z3)
 
-    return Z3
+    Z4 = tf.matmul(W4, A3) + b4
+
+    return Z4
 
 
-def compute_cost(Z3, Y):
-    logits = tf.transpose(Z3)
+def compute_cost(Z4, Y):
+    logits = tf.transpose(Z4)
     labels = tf.transpose(Y)
     cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=labels))
     return cost
 
 
-def random_mini_batches(X, Y, mini_batch_size=64, seed=0):
+def random_mini_batches(X, Y, mini_batch_size=64):
 
     m = X.shape[1]
     mini_batches = []
@@ -120,42 +131,23 @@ def random_mini_batches(X, Y, mini_batch_size=64, seed=0):
     return mini_batches
 
 
-def model(X_train, Y_train, X_test, Y_test, learning_rate=0.0001,
+def model(X_train, Y_train, X_test, Y_test, learning_rate=0.00009,
           num_epochs=1500, minibatch_size=32, print_cost=True):
-    """
-    Implements a three-layer tensorflow neural network: LINEAR->RELU->LINEAR->RELU->LINEAR->SOFTMAX.
-
-    Arguments:
-    X_train -- training set, of shape (input size = 12288, number of training examples = 1080)
-    Y_train -- test set, of shape (output size = 6, number of training examples = 1080)
-    X_test -- training set, of shape (input size = 12288, number of training examples = 120)
-    Y_test -- test set, of shape (output size = 6, number of test examples = 120)
-    learning_rate -- learning rate of the optimization
-    num_epochs -- number of epochs of the optimization loop
-    minibatch_size -- size of a minibatch
-    print_cost -- True to print the cost every 100 epochs
-
-    Returns:
-    parameters -- parameters learnt by the model. They can then be used to predict.
-    """
-
     ops.reset_default_graph()  # to be able to rerun the model without overwriting tf variables
-    seed = 3  # to keep consistent results
-    (n_x, m) = X_train.shape  # (n_x: input size, m : number of examples in the train set)
-    n_y = Y_train.shape[0]  # n_y : output size
-    costs = []  # To keep track of the cost
 
-    # Create Placeholders of shape (n_x, n_y)
-    X, Y, keepprob_A1 = create_placeholders(n_x, n_y)
+    (n_x, m) = X_train.shape
+    n_y = Y_train.shape[0]
+    costs = []
 
-    # Initialize parameters
+    X, Y, keepprob_A1, keepprob_A2 = create_placeholders(n_x, n_y)
+
     parameters = initialize_parameters()
 
     # Forward propagation
-    Z3 = forward_propagation(X, parameters, keepprob_A1)
+    Z4 = forward_propagation(X, parameters, keepprob_A1, keepprob_A2)
 
     # Cost function: Add cost function to tensorflow graph
-    cost = compute_cost(Z3, Y)
+    cost = compute_cost(Z4, Y)
 
     # Backpropagation: Define the tensorflow optimizer. Use an AdamOptimizer.
     optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(cost)
@@ -174,8 +166,7 @@ def model(X_train, Y_train, X_test, Y_test, learning_rate=0.0001,
 
             epoch_cost = 0.  # Defines a cost related to an epoch
             num_minibatches = int(m / minibatch_size)  # number of minibatches of size minibatch_size in the train set
-            seed = seed + 1
-            minibatches = random_mini_batches(X_train, Y_train, minibatch_size, seed)
+            minibatches = random_mini_batches(X_train, Y_train, minibatch_size)
 
             for minibatch in minibatches:
                 # Select a minibatch
@@ -183,7 +174,7 @@ def model(X_train, Y_train, X_test, Y_test, learning_rate=0.0001,
 
                 # IMPORTANT: The line that runs the graph on a minibatch. Run the session to execute the "optimizer"
                 # and the "cost", the feedict should contain a minibatch for (X,Y).
-                _, minibatch_cost = sess.run([optimizer, cost], feed_dict={X: minibatch_X, Y: minibatch_Y, keepprob_A1: 0.7})
+                _, minibatch_cost = sess.run([optimizer, cost], feed_dict={X: minibatch_X, Y: minibatch_Y, keepprob_A1: 0.8, keepprob_A2: 0.7})
 
                 epoch_cost += minibatch_cost / num_minibatches
 
@@ -205,13 +196,13 @@ def model(X_train, Y_train, X_test, Y_test, learning_rate=0.0001,
         print("Parameters have been trained!")
 
         # Calculate the correct predictions
-        correct_prediction = tf.equal(tf.argmax(Z3), tf.argmax(Y))
+        correct_prediction = tf.equal(tf.argmax(Z4), tf.argmax(Y))
 
         # Calculate accuracy on the test set
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
 
-        print("Train Accuracy:", accuracy.eval({X: X_train, Y: Y_train, keepprob_A1: 1}))
-        print("Test Accuracy:", accuracy.eval({X: X_test, Y: Y_test, keepprob_A1: 1}))
+        print("Train Accuracy:", accuracy.eval({X: X_train, Y: Y_train, keepprob_A1: 1, keepprob_A2: 1}))
+        print("Test Accuracy:", accuracy.eval({X: X_test, Y: Y_test, keepprob_A1: 1, keepprob_A2: 1}))
 
         return parameters
 
@@ -260,4 +251,4 @@ print('Y_train shape:' + str(Y_train.shape))
 print('X_test shape:' + str(X_test.shape))
 print('Y_test shape:' + str(Y_test.shape))
 
-parameters = model(X_train, Y_train, X_test, Y_test, num_epochs=550)
+parameters = model(X_train, Y_train, X_test, Y_test, num_epochs=210)
