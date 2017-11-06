@@ -143,7 +143,6 @@ def model(X_train, Y_train, X_test, Y_test, learning_rate=0.00009,
 
     parameters = initialize_parameters()
 
-    # Forward propagation
     Z4 = forward_propagation(X, parameters, keepprob_A1, keepprob_A2)
 
     # Cost function: Add cost function to tensorflow graph
