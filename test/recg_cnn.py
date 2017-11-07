@@ -110,13 +110,13 @@ def random_mini_batches(X, Y, mini_batch_size=64):
     return mini_batches
 
 
-saver = tf.train.Saver(save_relative_paths=True, max_to_keep=20)
+saver = tf.train.Saver(max_to_keep=20)
 
 
 with tf.Session() as sess:
     sess.run(tf.global_variables_initializer())
     step = 0
-    for epoch in range(100):
+    for epoch in range(550):
         epoch_cost = 0.
         m = X_train.shape[1]
         minibatch_size = 128
@@ -128,13 +128,18 @@ with tf.Session() as sess:
             yt = minibatch[1].T
             xt = xt.astype(np.float32)
             step = step + 1
-            sess.run(train_step, feed_dict={x: xt, y_: yt, keep_prob: 0.48})
+            _, minibatch_cost = sess.run([train_step, cross_entropy], feed_dict={x: xt, y_: yt, keep_prob: 0.46})
+
+            epoch_cost += minibatch_cost / num_minibatches
         
         if epoch % 5 == 0:
             dev_accuracy = sess.run(accuracy, feed_dict={x: X_test.T, y_: Y_test.T, keep_prob: 1.0})
             print("EPOCH {}, step {}, dev accuracy {}".format(epoch, step, dev_accuracy))
             train_accuracy = sess.run(accuracy, feed_dict={x: X_train.T, y_: Y_train.T, keep_prob: 1.0})
             print("EPOCH {}, training accuracy {}".format(epoch, train_accuracy))
+            print("Epoch cost: " + str(epoch_cost))
+
+        if epoch % 40 == 0:
             saver.save(sess=sess, save_path=os.path.join("../modelz/", "model_chkp"), global_step=step)
             
             
