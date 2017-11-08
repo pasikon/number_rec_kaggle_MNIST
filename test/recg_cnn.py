@@ -61,7 +61,12 @@ full1_drop = tf.nn.dropout(full_1, keep_prob=keep_prob)
 y_conv = full_layer(full1_drop, 10)
 
 cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=y_conv, labels=y_))
-train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
+
+global_step_tensor = tf.Variable(0, trainable=False, name="global_step")
+starter_learning_rate = 1e-4
+learning_rate = tf.train.exponential_decay(starter_learning_rate, global_step_tensor, 100000, 0.96)
+
+train_step = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(cross_entropy, global_step=global_step_tensor)
 correct_prediction = tf.equal(tf.argmax(y_conv, 1), tf.argmax(y_, 1))
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
@@ -115,8 +120,7 @@ saver = tf.train.Saver(max_to_keep=20)
 
 with tf.Session() as sess:
     sess.run(tf.global_variables_initializer())
-    step = 0
-    for epoch in range(550):
+    for epoch in range(150):
         epoch_cost = 0.
         m = X_train.shape[1]
         minibatch_size = 128
@@ -127,20 +131,21 @@ with tf.Session() as sess:
             xt = minibatch[0].T
             yt = minibatch[1].T
             xt = xt.astype(np.float32)
-            step = step + 1
-            _, minibatch_cost = sess.run([train_step, cross_entropy], feed_dict={x: xt, y_: yt, keep_prob: 0.46})
+            _, minibatch_cost = sess.run([train_step, cross_entropy], feed_dict={x: xt, y_: yt, keep_prob: 0.40})
 
             epoch_cost += minibatch_cost / num_minibatches
         
         if epoch % 5 == 0:
+            print("--------------------------------------------------------------------------------------------------")
+            print('global_step: %s' % tf.train.global_step(sess, global_step_tensor))
             dev_accuracy = sess.run(accuracy, feed_dict={x: X_test.T, y_: Y_test.T, keep_prob: 1.0})
-            print("EPOCH {}, step {}, dev accuracy {}".format(epoch, step, dev_accuracy))
+            print("EPOCH {}, DEV accuracy {}".format(epoch, dev_accuracy))
             train_accuracy = sess.run(accuracy, feed_dict={x: X_train.T, y_: Y_train.T, keep_prob: 1.0})
-            print("EPOCH {}, training accuracy {}".format(epoch, train_accuracy))
-            print("Epoch cost: " + str(epoch_cost))
+            print("EPOCH {}, TRAIN accuracy {}".format(epoch, train_accuracy))
+            print("EPOCH COST: " + str(epoch_cost))
 
         if epoch % 40 == 0:
-            saver.save(sess=sess, save_path=os.path.join("../modelz/", "model_chkp"), global_step=step)
+            saver.save(sess=sess, save_path=os.path.join("../modelz/", "model_chkp"), global_step=global_step_tensor)
             
             
             
