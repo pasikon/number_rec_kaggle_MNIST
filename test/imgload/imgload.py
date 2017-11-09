@@ -8,7 +8,7 @@ def loaddta(csvp):
     # print('data({0[0]},{0[1]})'.format(data.shape))
     # print(data.head())
     images = data.iloc[:, 1:].values
-    images = images.astype(np.float)
+    images = images.astype(np.float32)
     # convert from [0:255] => [0.0:1.0]
     images = np.multiply(images, 1.0 / 255.0)
     image_size = images.shape[1]
@@ -27,7 +27,7 @@ def loaddta(csvp):
     # print("y shape:" + str(y.shape))
     YOH = one_hot_matrix(y, 10)
     # print("YOH shape:" + str(YOH.shape))
-    return X, YOH
+    return X, YOH, y
 
 
 def one_hot_matrix(labels, C):

@@ -11,9 +11,10 @@ import matplotlib.cm as cm
 
 from test.convolutional.convlayers import bias_variable
 from test.convolutional.convlayers import conv2d
-from test.convolutional.convlayers import conv_layer
+from test.convolutional.convlayers import conv_layer_batch_norm
 from test.convolutional.convlayers import full_layer
 from test.convolutional.convlayers import max_pool_2x2
+
 
 def display(img):
     # (784) => (28,28)
@@ -23,7 +24,7 @@ def display(img):
     plt.show()
 
 
-X_loaded, Y_loaded = loaddta('../input/train.csv')
+X_loaded, Y_loaded, _ = loaddta('../input/train.csv')
 
 X_train = X_loaded[:, 0:39000]
 Y_train = Y_loaded[:, 0:39000]
@@ -35,24 +36,21 @@ print('Y_train shape:' + str(Y_train.shape))
 print('X_test shape:' + str(X_test.shape))
 print('Y_test shape:' + str(Y_test.shape))
 
-
-
-#display(X_train[:, 3905])
-
+# display(X_train[:, 3905])
 
 x = tf.placeholder(tf.float32, shape=(None, 784))
 y_ = tf.placeholder(tf.float32, shape=(None, 10))
-
+training_mode = tf.placeholder(tf.bool)
 
 x_image = tf.reshape(x, [-1, 28, 28, 1])
 
-conv1 = conv_layer(x_image, shape=[5, 5, 1, 32])
+conv1 = conv_layer_batch_norm(x_image, shape=[5, 5, 1, 32], training_mode=training_mode)
 conv1_pool = max_pool_2x2(conv1)
 
-conv2 = conv_layer(conv1_pool, shape=[5, 5, 32, 64])
+conv2 = conv_layer_batch_norm(conv1_pool, shape=[5, 5, 32, 64], training_mode=training_mode)
 conv2_pool = max_pool_2x2(conv2)
 
-conv2_flat = tf.reshape(conv2_pool, [-1, 7*7*64])
+conv2_flat = tf.reshape(conv2_pool, [-1, 7 * 7 * 64])
 full_1 = tf.nn.relu(full_layer(conv2_flat, 1024))
 
 keep_prob = tf.placeholder(tf.float32)
@@ -69,7 +67,6 @@ learning_rate = tf.train.exponential_decay(starter_learning_rate, global_step_te
 train_step = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(cross_entropy, global_step=global_step_tensor)
 correct_prediction = tf.equal(tf.argmax(y_conv, 1), tf.argmax(y_, 1))
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-
 
 print("conv1: " + str(conv1))
 print("conv1_pool: " + str(conv1_pool))
@@ -117,7 +114,6 @@ def random_mini_batches(X, Y, mini_batch_size=64):
 
 saver = tf.train.Saver(max_to_keep=20)
 
-
 with tf.Session() as sess:
     sess.run(tf.global_variables_initializer())
     for epoch in range(150):
@@ -126,28 +122,29 @@ with tf.Session() as sess:
         minibatch_size = 128
         num_minibatches = int(m / minibatch_size)
         minibatches = random_mini_batches(X_train, Y_train, minibatch_size)
-        
+
         for minibatch in minibatches:
             xt = minibatch[0].T
             yt = minibatch[1].T
             xt = xt.astype(np.float32)
-            _, minibatch_cost = sess.run([train_step, cross_entropy], feed_dict={x: xt, y_: yt, keep_prob: 0.40})
+
+            sess.run(train_step, feed_dict={x: xt, y_: yt, keep_prob: 0.40, training_mode: True})
+
+            minibatch_cost = \
+                sess.run(cross_entropy, feed_dict={x: xt, y_: yt, keep_prob: 1, training_mode: False})
 
             epoch_cost += minibatch_cost / num_minibatches
-        
+
         if epoch % 5 == 0:
             print("--------------------------------------------------------------------------------------------------")
             print('global_step: %s' % tf.train.global_step(sess, global_step_tensor))
-            dev_accuracy = sess.run(accuracy, feed_dict={x: X_test.T, y_: Y_test.T, keep_prob: 1.0})
+            dev_accuracy = \
+                sess.run(accuracy, feed_dict={x: X_test.T, y_: Y_test.T, keep_prob: 1.0, training_mode: False})
             print("EPOCH {}, DEV accuracy {}".format(epoch, dev_accuracy))
-            train_accuracy = sess.run(accuracy, feed_dict={x: X_train.T, y_: Y_train.T, keep_prob: 1.0})
+            train_accuracy = \
+                sess.run(accuracy, feed_dict={x: X_train.T, y_: Y_train.T, keep_prob: 1.0, training_mode: False})
             print("EPOCH {}, TRAIN accuracy {}".format(epoch, train_accuracy))
             print("EPOCH COST: " + str(epoch_cost))
 
-        if epoch % 40 == 0:
+        if epoch % 100 == 0:
             saver.save(sess=sess, save_path=os.path.join("../modelz/", "model_chkp"), global_step=global_step_tensor)
-            
-            
-            
-        
-

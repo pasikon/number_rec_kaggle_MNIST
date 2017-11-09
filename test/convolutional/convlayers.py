@@ -20,6 +20,13 @@ def max_pool_2x2(x):
                           strides=[1, 2, 2, 1], padding='SAME')
 
 
+def conv_layer_batch_norm(input, shape, training_mode):
+    W = weight_variable(shape)
+    # b = bias_variable([shape[3]])
+    cl = conv2d(input, W)
+    return tf.nn.relu(tf.layers.batch_normalization(cl, training=training_mode))
+
+
 def conv_layer(input, shape):
     W = weight_variable(shape)
     b = bias_variable([shape[3]])
