@@ -68,7 +68,7 @@ cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=y_
 
 global_step_tensor = tf.Variable(0, trainable=False, name="global_step")
 starter_learning_rate = 1e-4
-learning_rate = tf.train.exponential_decay(starter_learning_rate, global_step_tensor, 100000, 0.96)
+learning_rate = tf.train.exponential_decay(starter_learning_rate, global_step_tensor, 150000, 0.96)
 
 train_step = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(cross_entropy, global_step=global_step_tensor)
 correct_prediction = tf.equal(tf.argmax(y_conv, 1), tf.argmax(y_, 1))
