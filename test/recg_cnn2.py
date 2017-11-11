@@ -2,6 +2,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
+
 import numpy as np
 import tensorflow as tf
 from test.imgload.imgload import loaddta
@@ -102,12 +106,12 @@ def main(unused):
     train_input_fn = tf.estimator.inputs.numpy_input_fn(
         x={"x": train_data},
         y=train_labels,
-        batch_size=100,
+        batch_size=128,
         num_epochs=None,
         shuffle=True)
     mnist_classifier.train(
         input_fn=train_input_fn,
-        steps=20000,
+        steps=100000,
         hooks=[logging_hook])
 
     # Evaluate the model and print results
