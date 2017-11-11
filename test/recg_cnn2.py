@@ -1,10 +1,12 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+# from __future__ import absolute_import
+# from __future__ import division
+# from __future__ import print_function
 
-import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
+import os, sys, inspect
+
+currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+parentdir = os.path.dirname(currentdir)
+sys.path.insert(0, parentdir)
 
 import numpy as np
 import tensorflow as tf
@@ -73,7 +75,7 @@ def cnn_model_fn(features, labels, mode):
 
 
 def main(unused):
-    X_loaded, Y_loaded_oh, l = loaddta('../input/train.csv')
+    X_loaded, Y_loaded_oh, l = loaddta('input/train.csv')
 
     X_train = X_loaded[:, 0:39000]
     Y_train = Y_loaded_oh[:, 0:39000]
