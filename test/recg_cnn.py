@@ -4,6 +4,12 @@ import tensorflow as tf
 import numpy as np
 from tensorflow.python.framework import ops
 
+import os, sys, inspect
+
+currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+parentdir = os.path.dirname(currentdir)
+sys.path.insert(0, parentdir)
+
 from test.imgload.imgload import loaddta
 
 import matplotlib.pyplot as plt
@@ -24,7 +30,7 @@ def display(img):
     plt.show()
 
 
-X_loaded, Y_loaded, _ = loaddta('../input/train.csv')
+X_loaded, Y_loaded, _ = loaddta('input/train.csv')
 
 X_train = X_loaded[:, 0:39000]
 Y_train = Y_loaded[:, 0:39000]
@@ -116,7 +122,7 @@ saver = tf.train.Saver(max_to_keep=20)
 
 with tf.Session() as sess:
     sess.run(tf.global_variables_initializer())
-    for epoch in range(150):
+    for epoch in range(500):
         epoch_cost = 0.
         m = X_train.shape[1]
         minibatch_size = 128
@@ -147,4 +153,4 @@ with tf.Session() as sess:
             print("EPOCH COST: " + str(epoch_cost))
 
         if epoch % 100 == 0:
-            saver.save(sess=sess, save_path=os.path.join("../modelz/", "model_chkp"), global_step=global_step_tensor)
+            saver.save(sess=sess, save_path=os.path.join("modelz/", "model_chkp"), global_step=global_step_tensor)
