@@ -152,5 +152,5 @@ with tf.Session() as sess:
             print("EPOCH {}, TRAIN accuracy {}".format(epoch, train_accuracy))
             print("EPOCH COST: " + str(epoch_cost))
 
-        if epoch % 100 == 0:
+        if epoch % 5 == 0:
             saver.save(sess=sess, save_path=os.path.join("modelz/", "model_chkp"), global_step=global_step_tensor)
