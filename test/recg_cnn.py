@@ -39,8 +39,8 @@ def display(img):
     plt.show()
 
 
-def cnn_model_fn(features, labels, mode):
-    x_image = tf.reshape(features["x"], [-1, 28, 28, 1])
+def cnn_model_fn(features, keep_probability, mode):
+    x_image = tf.reshape(features, [-1, 28, 28, 1])
 
     conv1 = tf.layers.conv2d(
         inputs=x_image,
@@ -63,33 +63,22 @@ def cnn_model_fn(features, labels, mode):
     dense = tf.layers.dense(inputs=pool2_flat, units=1024, activation=tf.nn.relu)
 
     # keep_prob = tf.placeholder(tf.float32)
-    dropout = tf.layers.dropout(inputs=dense, rate=0.4, training=mode == tf.estimator.ModeKeys.TRAIN)
+    dropout = tf.layers.dropout(inputs=dense, rate=keep_probability, training=mode == tf.estimator.ModeKeys.TRAIN)
     logits = tf.layers.dense(inputs=dropout, units=10)
+
+    return logits
 
 
 X_train, Y_train, X_test, Y_test = load_train_and_dev_mnist()
 
-# display(X_train[:, 3905])
 
 x = tf.placeholder(tf.float32, shape=(None, 784))
 y_ = tf.placeholder(tf.float32, shape=(None, 10))
-training_mode = tf.placeholder(tf.bool)
+keep_prob = tf.placeholder(tf.float32, name="keep_prob")
+training_mode = tf.placeholder(tf.bool, name="training_mode_bool")
 
-x_image = tf.reshape(x, [-1, 28, 28, 1])
 
-conv1 = conv_layer_batch_norm(x_image, shape=[5, 5, 1, 32], training_mode=training_mode)
-conv1_pool = max_pool_2x2(conv1)
-
-conv2 = conv_layer_batch_norm(conv1_pool, shape=[5, 5, 32, 64], training_mode=training_mode)
-conv2_pool = max_pool_2x2(conv2)
-
-conv2_flat = tf.reshape(conv2_pool, [-1, 7 * 7 * 64])
-full_1 = tf.nn.relu(full_layer(conv2_flat, 1024))
-
-keep_prob = tf.placeholder(tf.float32)
-full1_drop = tf.nn.dropout(full_1, keep_prob=keep_prob)
-
-y_conv = full_layer(full1_drop, 10)
+y_conv = cnn_model_fn(x, keep_prob, training_mode)
 
 cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=y_conv, labels=y_))
 
@@ -101,21 +90,13 @@ learning_rate = tf.Variable(starter_learning_rate, trainable=False)
 optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
 train_step = optimizer.minimize(cross_entropy, global_step=global_step_tensor)
 
-valMon = ValidationMonitor(x=X_train.T, y=Y_train.T, every_n_steps=300)
-logHook = LoggingTensorHook(every_n_iter=300, tensors={learning_rate})
+# valMon = ValidationMonitor(x=X_train.T, y=Y_train.T, every_n_steps=300)
+# logHook = LoggingTensorHook(every_n_iter=300, tensors={learning_rate})
 
-tf.estimator.EstimatorSpec(train_op=train_step, loss=cross_entropy, training_hooks={logHook})
+# tf.estimator.EstimatorSpec(train_op=train_step, loss=cross_entropy, training_hooks={logHook})
 
 correct_prediction = tf.equal(tf.argmax(y_conv, 1), tf.argmax(y_, 1))
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-
-print("conv1: " + str(conv1))
-print("conv1_pool: " + str(conv1_pool))
-print("conv2: " + str(conv2))
-print("conv2_pool: " + str(conv2_pool))
-print("conv2_flat: " + str(conv2_flat))
-print("full_1: " + str(full_1))
-print("y_conv: " + str(y_conv))
 
 
 def random_mini_batches(X, Y, mini_batch_size=64):
