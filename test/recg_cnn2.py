@@ -2,14 +2,15 @@
 # from __future__ import division
 # from __future__ import print_function
 
-import os, sys, inspect
+import os
+import sys
+import inspect
+import numpy as np
+import tensorflow as tf
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0, parentdir)
-
-import numpy as np
-import tensorflow as tf
 from test.imgload.imgload import loaddta
 
 tf.logging.set_verbosity(tf.logging.INFO)
@@ -60,7 +61,7 @@ def cnn_model_fn(features, labels, mode):
 
     # Configure the Training Op (for TRAIN mode)
     if mode == tf.estimator.ModeKeys.TRAIN:
-        optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.001)
+        optimizer = tf.train.AdamOptimizer(learning_rate=0.001)
         train_op = optimizer.minimize(
             loss=loss,
             global_step=tf.train.get_global_step())
@@ -68,8 +69,9 @@ def cnn_model_fn(features, labels, mode):
 
     # Add evaluation metrics (for EVAL mode)
     eval_metric_ops = {
-        "accuracy": tf.metrics.accuracy(
-            labels=labels, predictions=predictions["classes"])}
+        "accuracy": tf.metrics.accuracy(labels=labels, predictions=predictions["classes"]),
+        "false_negatives": tf.metrics.false_negatives(labels=labels, predictions=predictions["classes"], name="my_false_posotives")
+    }
     return tf.estimator.EstimatorSpec(
         mode=mode, loss=loss, eval_metric_ops=eval_metric_ops)
 
@@ -97,10 +99,11 @@ def main(unused):
     print('eval_labels shape:' + str(eval_labels.shape))
 
     mnist_classifier = tf.estimator.Estimator(
-        model_fn=cnn_model_fn, model_dir="/tmp/mnist_convnet_model")
+        model_fn=cnn_model_fn, model_dir="/tmp/mnist_convnet_model_adam")
 
     # Set up logging for predictions
-    tensors_to_log = {"probabilities": "softmax_tensor"}
+    # tensors_to_log = {"probabilities": "softmax_tensor"}
+    tensors_to_log = {}
     logging_hook = tf.train.LoggingTensorHook(
         tensors=tensors_to_log, every_n_iter=50)
 

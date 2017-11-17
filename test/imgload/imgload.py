@@ -30,6 +30,22 @@ def loaddta(csvp):
     return X, YOH, y
 
 
+def load_train_and_dev_mnist():
+    X_loaded, Y_loaded, _ = loaddta('input/train.csv')
+
+    X_train = X_loaded[:, 0:39000]
+    Y_train = Y_loaded[:, 0:39000]
+    X_test = X_loaded[:, 39001:41999]
+    Y_test = Y_loaded[:, 39001:41999]
+
+    print('X_train shape:' + str(X_train.shape))
+    print('Y_train shape:' + str(Y_train.shape))
+    print('X_test shape:' + str(X_test.shape))
+    print('Y_test shape:' + str(Y_test.shape))
+
+    return X_train, Y_train, X_test, Y_test
+
+
 def one_hot_matrix(labels, C):
     c = tf.constant(C, name="C")
     oht = tf.one_hot(indices=labels, depth=c, axis=1)

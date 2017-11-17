@@ -1,16 +1,23 @@
 import math
 import os
+import sys
+import inspect
+
 import tensorflow as tf
 import numpy as np
+from tensorflow.contrib.learn.python.learn.monitors import ValidationMonitor
+from tensorflow.python.estimator.model_fn import EstimatorSpec
 from tensorflow.python.framework import ops
 
-import os, sys, inspect
+
+from tensorflow.python.training.basic_session_run_hooks import LoggingTensorHook
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0, parentdir)
 
 from test.imgload.imgload import loaddta
+from test.imgload.imgload import load_train_and_dev_mnist
 
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
@@ -21,6 +28,8 @@ from test.convolutional.convlayers import conv_layer_batch_norm
 from test.convolutional.convlayers import full_layer
 from test.convolutional.convlayers import max_pool_2x2
 
+tf.logging.set_verbosity(tf.logging.INFO)
+
 
 def display(img):
     # (784) => (28,28)
@@ -30,17 +39,35 @@ def display(img):
     plt.show()
 
 
-X_loaded, Y_loaded, _ = loaddta('input/train.csv')
+def cnn_model_fn(features, labels, mode):
+    x_image = tf.reshape(features["x"], [-1, 28, 28, 1])
 
-X_train = X_loaded[:, 0:39000]
-Y_train = Y_loaded[:, 0:39000]
-X_test = X_loaded[:, 39001:41999]
-Y_test = Y_loaded[:, 39001:41999]
+    conv1 = tf.layers.conv2d(
+        inputs=x_image,
+        filters=32,
+        kernel_size=[5, 5],
+        padding="same",
+        activation=tf.nn.relu)
+    conv1_pool = tf.layers.max_pooling2d(inputs=conv1, pool_size=[2, 2], strides=2)
 
-print('X_train shape:' + str(X_train.shape))
-print('Y_train shape:' + str(Y_train.shape))
-print('X_test shape:' + str(X_test.shape))
-print('Y_test shape:' + str(Y_test.shape))
+    conv2 = tf.layers.conv2d(
+        inputs=conv1_pool,
+        filters=64,
+        kernel_size=[5, 5],
+        padding="same",
+        activation=tf.nn.relu)
+    conv2_pool = tf.layers.max_pooling2d(inputs=conv2, pool_size=[2, 2], strides=2)
+
+    # dense layer
+    pool2_flat = tf.reshape(conv2_pool, [-1, 7 * 7 * 64])
+    dense = tf.layers.dense(inputs=pool2_flat, units=1024, activation=tf.nn.relu)
+
+    # keep_prob = tf.placeholder(tf.float32)
+    dropout = tf.layers.dropout(inputs=dense, rate=0.4, training=mode == tf.estimator.ModeKeys.TRAIN)
+    logits = tf.layers.dense(inputs=dropout, units=10)
+
+
+X_train, Y_train, X_test, Y_test = load_train_and_dev_mnist()
 
 # display(X_train[:, 3905])
 
@@ -68,9 +95,17 @@ cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=y_
 
 global_step_tensor = tf.Variable(0, trainable=False, name="global_step")
 starter_learning_rate = 1e-4
-learning_rate = tf.train.exponential_decay(starter_learning_rate, global_step_tensor, 150000, 0.96)
+# learning_rate = tf.train.exponential_decay(starter_learning_rate, global_step_tensor, 150000, 0.96)
+learning_rate = tf.Variable(starter_learning_rate, trainable=False)
 
-train_step = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(cross_entropy, global_step=global_step_tensor)
+optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
+train_step = optimizer.minimize(cross_entropy, global_step=global_step_tensor)
+
+valMon = ValidationMonitor(x=X_train.T, y=Y_train.T, every_n_steps=300)
+logHook = LoggingTensorHook(every_n_iter=300, tensors={learning_rate})
+
+tf.estimator.EstimatorSpec(train_op=train_step, loss=cross_entropy, training_hooks={logHook})
+
 correct_prediction = tf.equal(tf.argmax(y_conv, 1), tf.argmax(y_, 1))
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
@@ -132,7 +167,6 @@ with tf.Session() as sess:
         for minibatch in minibatches:
             xt = minibatch[0].T
             yt = minibatch[1].T
-            xt = xt.astype(np.float32)
 
             sess.run(train_step, feed_dict={x: xt, y_: yt, keep_prob: 0.40, training_mode: True})
 
