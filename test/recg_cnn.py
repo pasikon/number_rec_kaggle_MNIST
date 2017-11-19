@@ -17,12 +17,39 @@ import matplotlib.cm as cm
 tf.logging.set_verbosity(tf.logging.INFO)
 
 
+def variable_summaries(var):
+    """Attach a lot of summaries to a Tensor (for TensorBoard visualization)."""
+    with tf.name_scope('summaries'):
+        mean = tf.reduce_mean(var)
+        tf.summary.scalar('mean', mean)
+        with tf.name_scope('stddev'):
+            stddev = tf.sqrt(tf.reduce_mean(tf.square(var - mean)))
+        tf.summary.scalar('stddev', stddev)
+        tf.summary.scalar('max', tf.reduce_max(var))
+        tf.summary.scalar('min', tf.reduce_min(var))
+        tf.summary.histogram('histogram', var)
+
+
 def display(img):
     # (784) => (28,28)
     one_image = img.reshape(28, 28)
     plt.axis('off')
     plt.imshow(one_image, cmap=cm.binary)
     plt.show()
+
+
+def visualize_filters(filters_var):
+    with tf.variable_scope('filter_visualization'):
+        # scale weights to [0 1], type is still float
+        x_min = tf.reduce_min(filters_var)
+        x_max = tf.reduce_max(filters_var)
+        kernel_0_to_1 = (filters_var - x_min) / (x_max - x_min)
+
+        # to tf.image_summary format [batch_size, height, width, channels]
+        kernel_transposed = tf.transpose(kernel_0_to_1, [3, 0, 1, 2])
+
+        # this will display random 3 filters from the 64 in conv1
+        tf.summary.image('conv1/filters', kernel_transposed, max_outputs=20)
 
 
 def cnn_model_fn(features, keep_probability, mode):
@@ -35,6 +62,11 @@ def cnn_model_fn(features, keep_probability, mode):
         padding="same",
         activation=tf.nn.relu)
     conv1_pool = tf.layers.max_pooling2d(inputs=conv1, pool_size=[2, 2], strides=2)
+    kernels_conv1 = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, 'conv2d/kernel')[0]
+    visualize_filters(kernels_conv1)
+    # with tf.variable_scope('conv2d'):
+    #     filters = tf.get_variable(name="kernel:0", , shape=(5, 5, 1, 32))
+    #     visualize_filters(filters)
 
     conv2 = tf.layers.conv2d(
         inputs=conv1_pool,
@@ -64,10 +96,12 @@ training_mode = tf.placeholder(tf.bool, name="training_mode_bool")
 
 y_conv = cnn_model_fn(x, keep_prob, training_mode)
 
-cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=y_conv, labels=y_))
+with tf.name_scope("cross_entropy"):
+    cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=y_conv, labels=y_))
+    tf.summary.scalar('cross_entropy', cross_entropy)
 
 global_step_tensor = tf.Variable(0, trainable=False, name="global_step")
-starter_learning_rate = 1e-4
+starter_learning_rate = 0.3 * 1e-4
 
 with tf.name_scope("learning_rate"):
     # learning_rate = tf.train.exponential_decay(starter_learning_rate, global_step_tensor, 150000, 0.96)
@@ -92,15 +126,19 @@ tf.summary.scalar('accuracy', accuracy)
 
 saver = tf.train.Saver(max_to_keep=20)
 
-
 with tf.Session() as sess:
-
     sess.run(tf.global_variables_initializer())
 
+    # Print all global variables
+    for v in tf.global_variables():
+        print(v)
+
     merged = tf.summary.merge_all()
-    train_writer = tf.summary.FileWriter('/tmp/tensorflow/mnist/logs/mnist_with_summaries_cnn/train', sess.graph)
-    test_writer_dev = tf.summary.FileWriter('/tmp/tensorflow/mnist/logs/mnist_with_summaries_cnn/test_dev')
-    test_writer_train = tf.summary.FileWriter('/tmp/tensorflow/mnist/logs/mnist_with_summaries_cnn/test_train')
+    train_writer = tf.summary.FileWriter('q:/tensorflow/mnist/logs/mnist_with_summaries_cnn/train', sess.graph)
+    test_writer_dev = tf.summary.FileWriter('q:/tensorflow/mnist/logs/mnist_with_summaries_cnn/test_dev')
+    test_writer_train = tf.summary.FileWriter('q:/tensorflow/mnist/logs/mnist_with_summaries_cnn/test_train')
+
+    saver.restore(sess, save_path=os.path.join("modelz/", "model_chkp-43310"))
 
     for epoch in range(500):
         epoch_cost = 0.
@@ -116,22 +154,28 @@ with tf.Session() as sess:
             run_metadata = tf.RunMetadata()
             sess.run(train_step, feed_dict={x: xt, y_: yt, keep_prob: 0.40, training_mode: True},
                      run_metadata=run_metadata, options=run_options)
-            train_writer.add_run_metadata(run_metadata, tf.train.global_step(sess, global_step_tensor))
+            # train_writer.add_run_metadata(run_metadata, tf.train.global_step(sess, global_step_tensor))
 
             minibatch_cost = \
                 sess.run(cross_entropy, feed_dict={x: xt, y_: yt, keep_prob: 1, training_mode: False})
 
             epoch_cost += minibatch_cost / num_minibatches
 
+            if tf.train.global_step(sess, global_step_tensor) % 50 == 0:
+                summary, dev_accuracy = \
+                    sess.run([merged, accuracy],
+                             feed_dict={x: X_test.T, y_: Y_test.T, keep_prob: 1.0, training_mode: False})
+                test_writer_dev.add_summary(summary, tf.train.global_step(sess, global_step_tensor))
+                print("EPOCH {}, step {}, DEV accuracy {}".format(epoch,
+                                                                  tf.train.global_step(sess, global_step_tensor),
+                                                                  dev_accuracy))
+
         if epoch % 5 == 0:
             print("--------------------------------------------------------------------------------------------------")
             print('global_step: %s' % tf.train.global_step(sess, global_step_tensor))
-            summary, dev_accuracy = \
-                sess.run([merged, accuracy], feed_dict={x: X_test.T, y_: Y_test.T, keep_prob: 1.0, training_mode: False})
-            test_writer_dev.add_summary(summary, tf.train.global_step(sess, global_step_tensor))
-            print("EPOCH {}, DEV accuracy {}".format(epoch, dev_accuracy))
             summary, train_accuracy = \
-                sess.run([merged, accuracy], feed_dict={x: X_train.T, y_: Y_train.T, keep_prob: 1.0, training_mode: False})
+                sess.run([merged, accuracy],
+                         feed_dict={x: X_train.T, y_: Y_train.T, keep_prob: 1.0, training_mode: False})
             test_writer_train.add_summary(summary, tf.train.global_step(sess, global_step_tensor))
             print("EPOCH {}, TRAIN accuracy {}".format(epoch, train_accuracy))
             print("EPOCH COST: " + str(epoch_cost))
