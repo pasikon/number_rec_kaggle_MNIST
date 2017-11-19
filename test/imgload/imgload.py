@@ -1,3 +1,5 @@
+import math
+
 import pandas as pd
 import tensorflow as tf
 import numpy as np
@@ -53,3 +55,38 @@ def one_hot_matrix(labels, C):
         yoh = sess.run(oht)
     yoh = yoh[0]
     return yoh
+
+
+def random_mini_batches(X, Y, mini_batch_size=64):
+    """
+    Produces shuffled list of minibatches
+    :param X:
+    :param Y:
+    :param mini_batch_size:
+    :return: List of tuples (mini_batch_X, mini_batch_Y)
+    """
+    m = X.shape[1]
+    mini_batches = []
+
+    # Shuffle (X, Y)
+    permutation = list(np.random.permutation(m))
+    shuffled_X = X[:, permutation]
+    shuffled_Y = Y[:, permutation].reshape((Y.shape[0], m))
+
+    # Partition (shuffled_X, shuffled_Y). Minus the end case.
+    num_complete_minibatches = math.floor(
+        m / mini_batch_size)  # number of mini batches of size mini_batch_size in your partitionning
+    for k in range(0, num_complete_minibatches):
+        mini_batch_X = shuffled_X[:, k * mini_batch_size: k * mini_batch_size + mini_batch_size]
+        mini_batch_Y = shuffled_Y[:, k * mini_batch_size: k * mini_batch_size + mini_batch_size]
+        mini_batch = (mini_batch_X, mini_batch_Y)
+        mini_batches.append(mini_batch)
+
+    # Handling end case where last mini-batch < mini_batch_size
+    if m % mini_batch_size != 0:
+        mini_batch_X = shuffled_X[:, num_complete_minibatches * mini_batch_size: m]
+        mini_batch_Y = shuffled_Y[:, num_complete_minibatches * mini_batch_size: m]
+        mini_batch = (mini_batch_X, mini_batch_Y)
+        mini_batches.append(mini_batch)
+
+    return mini_batches
